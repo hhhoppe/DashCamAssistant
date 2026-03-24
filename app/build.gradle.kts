@@ -44,4 +44,17 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+
+    // CameraX
+    implementation("androidx.camera:camera-core:1.5.0-alpha05")
+    implementation("androidx.camera:camera-camera2:1.5.0-alpha05")
+    implementation("androidx.camera:camera-lifecycle:1.5.0-alpha05")
+    implementation("androidx.camera:camera-view:1.5.0-alpha05")
+    implementation("androidx.camera:camera-video:1.5.0-alpha05")
+
+    // Coroutines
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+
+    // OpenCV
+    implementation("com.quickbirdstudios:opencv:4.5.3.0")
 }
