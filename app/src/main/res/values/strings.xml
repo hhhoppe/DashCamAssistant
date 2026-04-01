@@ -1,3 +1,7 @@
 <resources>
     <string name="app_name">DashCamAssistant</string>
+    <string name="btn_start_recording">▶ Запись</string>
+    <string name="btn_stop_recording">⏹ Стоп</string>
+    <string name="btn_settings">⚙️</string>
+    <string name="warning_movement">🚗 Впереди поехали!</string>
 </resources>

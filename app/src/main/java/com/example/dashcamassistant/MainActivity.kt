@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.video.*
@@ -20,6 +21,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
 
@@ -27,12 +29,18 @@ class MainActivity : AppCompatActivity() {
     private lateinit var cameraExecutor: ExecutorService
     private var videoCapture: VideoCapture<Recorder>? = null
     private var recording: Recording? = null
+    private var imageAnalysis: ImageAnalysis? = null
+    private var visionAnalyzer: VisionAnalyzer? = null
+    private var speedTracker: SpeedTracker? = null
+
+    private var isCarMoving = false
 
     // Необходимые разрешения
     private val requiredPermissions = arrayOf(
         Manifest.permission.CAMERA,
         Manifest.permission.RECORD_AUDIO,
-        Manifest.permission.WRITE_EXTERNAL_STORAGE
+        Manifest.permission.WRITE_EXTERNAL_STORAGE,
+        Manifest.permission.ACCESS_FINE_LOCATION
     )
 
     // Запрос разрешений
@@ -42,8 +50,9 @@ class MainActivity : AppCompatActivity() {
         val allGranted = permissions.values.all { it }
         if (allGranted) {
             startCamera()
+            startSpeedTracker()
         } else {
-            Toast.makeText(this, "Необходимы разрешения для работы", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Необходимы все разрешения для работы", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -60,6 +69,7 @@ class MainActivity : AppCompatActivity() {
         // Проверяем разрешения
         if (checkPermissions()) {
             startCamera()
+            startSpeedTracker()
         } else {
             requestPermissions()
         }
@@ -88,6 +98,18 @@ class MainActivity : AppCompatActivity() {
         permissionLauncher.launch(requiredPermissions)
     }
 
+    private fun startSpeedTracker() {
+        speedTracker = SpeedTracker(this) { speed ->
+            runOnUiThread {
+                isCarMoving = speed > 5f
+                val speedText = String.format(Locale.getDefault(), "Скорость: %.0f км/ч", speed)
+                binding.tvSpeed.text = speedText
+                binding.tvSpeed.visibility = android.view.View.VISIBLE
+            }
+        }
+        speedTracker?.start()
+    }
+
     private fun startCamera() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
 
@@ -110,13 +132,26 @@ class MainActivity : AppCompatActivity() {
                 .build()
             videoCapture = VideoCapture.withOutput(recorder)
 
+            imageAnalysis = ImageAnalysis.Builder()
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .build()
+
+            // Передаём в анализатор флаг движения автомобиля
+            visionAnalyzer = VisionAnalyzer(this, { isCarMoving }) {
+                runOnUiThread {
+                    showMovementWarning()
+                }
+            }
+            imageAnalysis?.setAnalyzer(cameraExecutor, visionAnalyzer!!)
+
             try {
                 cameraProvider.unbindAll()
                 cameraProvider.bindToLifecycle(
                     this,
                     cameraSelector,
                     preview,
-                    videoCapture
+                    videoCapture,
+                    imageAnalysis
                 )
             } catch (exc: Exception) {
                 Toast.makeText(this, "Ошибка запуска камеры: ${exc.message}", Toast.LENGTH_SHORT).show()
@@ -185,5 +220,15 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         cameraExecutor.shutdown()
+        visionAnalyzer?.release()
+        speedTracker?.stop()
+    }
+
+    private fun showMovementWarning() {
+        binding.tvWarning.text = "🚗 Впереди поехали!"
+        binding.tvWarning.visibility = android.view.View.VISIBLE
+        binding.root.postDelayed({
+            binding.tvWarning.visibility = android.view.View.GONE
+        }, 2000)
     }
 }
