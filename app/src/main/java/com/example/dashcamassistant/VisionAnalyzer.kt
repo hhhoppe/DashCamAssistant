@@ -23,12 +23,12 @@ class VisionAnalyzer(
         private const val TAG = "VisionAnalyzer"
 
         // Настройки
-        private const val MOVEMENT_THRESHOLD = 120      // движение
-        private const val MIN_CONTOUR_AREA = 2500       // минимальная площадь объекта
-        private const val MIN_CAR_WIDTH = 100           // минимальная ширина машины в пикселях
+        private const val MOVEMENT_THRESHOLD = 120      // Минимальное смещение объекта
+        private const val MIN_CONTOUR_AREA = 2500       // Минимальный размер объекта
+        private const val MIN_CAR_WIDTH = 100           // Минимальная ширина машины
         private const val STATIONARY_THRESHOLD = 15     // порог "стоит"
         private const val ACCELEROMETER_THRESHOLD = 0.5f
-        private const val COOLDOWN_MS = 3000            // 3 секунды после срабатывания
+        private const val COOLDOWN_MS = 3000            // Пауза между срабатываниями
     }
 
     private var previousFrame: Mat? = null
