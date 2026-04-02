@@ -64,6 +64,15 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        // Получаем высоту статус-бара
+        val resourceId = resources.getIdentifier("status_bar_height", "dimen", "android")
+        val statusBarHeight = if (resourceId > 0) resources.getDimensionPixelSize(resourceId) else 0
+
+        // Применяем отступ к tvSpeed
+        val params = binding.tvSpeed.layoutParams as androidx.constraintlayout.widget.ConstraintLayout.LayoutParams
+        params.topMargin = statusBarHeight
+        binding.tvSpeed.layoutParams = params
+
         cameraExecutor = Executors.newSingleThreadExecutor()
 
         // Проверяем разрешения
@@ -86,6 +95,9 @@ class MainActivity : AppCompatActivity() {
         binding.btnSettings.setOnClickListener {
             Toast.makeText(this, "Настройки будут в следующей версии", Toast.LENGTH_SHORT).show()
         }
+
+        // Чтобы экран не уходил в сон
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
     private fun checkPermissions(): Boolean {
