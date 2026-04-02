@@ -35,6 +35,9 @@ class MainActivity : AppCompatActivity() {
 
     private var isCarMoving = false
 
+    private var isCalibrationRequested = false
+    private var isCalibrationDone = false
+
     // Необходимые разрешения
     private val requiredPermissions = arrayOf(
         Manifest.permission.CAMERA,
@@ -63,6 +66,9 @@ class MainActivity : AppCompatActivity() {
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        // Проверяем, пришли ли из настроек с запросом на калибровку
+        isCalibrationRequested = intent.getBooleanExtra("start_calibration", false)
 
         // Получаем высоту статус-бара
         val resourceId = resources.getIdentifier("status_bar_height", "dimen", "android")
@@ -93,7 +99,8 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.btnSettings.setOnClickListener {
-            Toast.makeText(this, "Настройки будут в следующей версии", Toast.LENGTH_SHORT).show()
+            val intent = android.content.Intent(this, SettingsActivity::class.java)
+            startActivity(intent)
         }
 
         // Чтобы экран не уходил в сон
@@ -155,6 +162,26 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             imageAnalysis?.setAnalyzer(cameraExecutor, visionAnalyzer!!)
+
+            // Если запрошена калибровка, запускаем её
+            if (isCalibrationRequested) {
+                visionAnalyzer?.startCalibration { success ->
+                    runOnUiThread {
+                        if (success) {
+                            isCalibrationDone = true
+                            Toast.makeText(this, "Калибровка завершена!", Toast.LENGTH_LONG).show()
+                            // Сохраняем маску через CalibrationHelper
+                            val calibrationHelper = CalibrationHelper(this)
+                            visionAnalyzer?.getMaskBitmap()?.let { mask ->
+                                calibrationHelper.saveMask(mask)
+                            }
+                        } else {
+                            Toast.makeText(this, "Ошибка калибровки", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+                isCalibrationRequested = false
+            }
 
             try {
                 cameraProvider.unbindAll()

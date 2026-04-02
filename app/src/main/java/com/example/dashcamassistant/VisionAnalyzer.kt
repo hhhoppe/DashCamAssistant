@@ -12,6 +12,8 @@ import androidx.camera.core.ImageProxy
 import org.opencv.android.OpenCVLoader
 import org.opencv.core.*
 import org.opencv.imgproc.Imgproc
+import android.graphics.Bitmap
+import org.opencv.android.Utils
 
 class VisionAnalyzer(
     context: Context,
@@ -44,6 +46,11 @@ class VisionAnalyzer(
     private var movementCounter = 0
     private var stableCounter = 0
 
+    private var calibrationMask: Mat? = null
+    private var isCalibrating = false
+    private val autoCalibration = AutoCalibration()
+    private var calibrationCallback: ((Boolean) -> Unit)? = null
+
     init {
         if (!OpenCVLoader.initDebug()) {
             Log.e(TAG, "OpenCV initialization failed")
@@ -51,10 +58,32 @@ class VisionAnalyzer(
         accelerometer?.let {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
         }
+
+        // Загружаем сохранённую маску
+        val calibrationHelper = CalibrationHelper(context)
+        val savedMask = calibrationHelper.loadMask()
+        if (savedMask != null) {
+            loadMask(savedMask)
+            Log.d(TAG, "Загружена сохранённая калибровка")
+        }
     }
 
     override fun analyze(imageProxy: ImageProxy) {
         val currentFrame = imageProxy.toMat() ?: run {
+            imageProxy.close()
+            return
+        }
+
+        // Режим калибровки
+        if (isCalibrating) {
+            val maskBitmap = autoCalibration.addFrame(currentFrame)
+            if (maskBitmap != null) {
+                isCalibrating = false
+                loadMask(maskBitmap)
+                calibrationCallback?.invoke(true)
+                Log.d(TAG, "Калибровка завершена")
+            }
+            currentFrame.release()
             imageProxy.close()
             return
         }
@@ -67,6 +96,12 @@ class VisionAnalyzer(
     }
 
     private fun detectMovement(currentFrame: Mat) {
+        // Если нет калибровки — не анализируем
+        if (calibrationMask == null) {
+            Log.d(TAG, "Нет калибровки, анализ отключён")
+            return
+        }
+
         if (previousFrame == null) return
 
         // Проверка на кулдаун после последнего срабатывания
@@ -100,6 +135,21 @@ class VisionAnalyzer(
         val contours = mutableListOf<MatOfPoint>()
         val hierarchy = Mat()
         Imgproc.findContours(gray, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
+
+        // Проверка по маске калибровки: игнорируем зоны, отмеченные белым
+        if (calibrationMask != null) {
+            // Удаляем контуры, которые попадают в запрещённую зону
+            contours.removeAll { contour ->
+                val rect = Imgproc.boundingRect(contour)
+                val centerX = rect.x + rect.width / 2
+                val centerY = rect.y + rect.height / 2
+
+                // Проверяем, что центр контура не попадает в белую область маски
+                centerY < calibrationMask!!.rows() &&
+                        centerX < calibrationMask!!.cols() &&
+                        calibrationMask!!.get(centerY, centerX)[0] > 200.0  // белый - игнорируем
+            }
+        }
 
         val frameHeight = currentFrame.rows()
         val frameWidth = currentFrame.cols()
@@ -238,5 +288,36 @@ class VisionAnalyzer(
 
     fun release() {
         sensorManager.unregisterListener(this)
+    }
+
+    fun startCalibration(callback: (Boolean) -> Unit) {
+        calibrationCallback = callback
+        isCalibrating = true
+        autoCalibration.reset()
+        Log.d(TAG, "Начало автоматической калибровки")
+    }
+
+    fun loadMask(maskBitmap: Bitmap?) {
+        if (maskBitmap == null) {
+            calibrationMask?.release()
+            calibrationMask = null
+            return
+        }
+
+        val maskMat = Mat()
+        Utils.bitmapToMat(maskBitmap, maskMat)
+        val grayMask = Mat()
+        Imgproc.cvtColor(maskMat, grayMask, Imgproc.COLOR_BGRA2GRAY)
+        calibrationMask?.release()
+        calibrationMask = grayMask.clone()
+        grayMask.release()
+        maskMat.release()
+    }
+
+    fun getMaskBitmap(): Bitmap? {
+        if (calibrationMask == null) return null
+        val bitmap = Bitmap.createBitmap(calibrationMask!!.cols(), calibrationMask!!.rows(), Bitmap.Config.ARGB_8888)
+        Utils.matToBitmap(calibrationMask!!, bitmap)
+        return bitmap
     }
 }
