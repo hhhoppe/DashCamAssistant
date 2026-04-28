@@ -83,6 +83,7 @@ class VisionAnalyzer(
             Log.d(TAG, "Калибровка: кадр ${calibrationFrameCount}/$NEED_FRAMES")
 
             val maskBitmap = autoCalibration.addFrame(currentFrame)
+            Log.d(TAG, "После addFrame: maskBitmap = ${if (maskBitmap != null) "НЕ null" else "null"}")
 
             // Если получили маску ИЛИ набрали достаточно кадров
             if (maskBitmap != null) {
@@ -92,7 +93,7 @@ class VisionAnalyzer(
                 Log.d(TAG, "Калибровка завершена успешно! Размер маски: ${maskBitmap.width}x${maskBitmap.height}")
                 calibrationFrameCount = 0
                 autoCalibration.reset()
-            } else if (calibrationFrameCount >= NEED_FRAMES) {
+            } else if (calibrationFrameCount >= NEED_FRAMES + 20) {
                 isCalibrating = false
                 Log.d(TAG, "Калибровка завершена с ошибкой: маска не создалась")
                 calibrationCallback?.invoke(false)
