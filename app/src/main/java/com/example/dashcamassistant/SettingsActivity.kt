@@ -29,6 +29,7 @@ class SettingsActivity : AppCompatActivity() {
 
         // Кнопка сброса калибровки
         binding.btnResetCalibration.setOnClickListener {
+            Log.d("SettingsActivity", "Сброс калибровки нажат")
             calibrationHelper.resetCalibration()
             Toast.makeText(this, "Калибровка сброшена", Toast.LENGTH_SHORT).show()
             updateCalibrationStatus()

@@ -31,8 +31,7 @@ class VisionAnalyzer(
         private const val STATIONARY_THRESHOLD = 15     // порог "стоит"
         private const val ACCELEROMETER_THRESHOLD = 0.5f
         private const val COOLDOWN_MS = 3000            // Пауза между срабатываниями
-
-        private var noCalibrationLogged = false         // Для вывода лога о калибровки один раз
+        private var noCalibrationLogged = false
     }
 
     private var previousFrame: Mat? = null
@@ -49,9 +48,11 @@ class VisionAnalyzer(
     private var stableCounter = 0
 
     private var calibrationMask: Mat? = null
-    private var isCalibrating = false
+    var isCalibrating = false
     private val autoCalibration = AutoCalibration()
     private var calibrationCallback: ((Boolean) -> Unit)? = null
+    private var calibrationFrameCount = 0
+    private val NEED_FRAMES = 150
 
     init {
         if (!OpenCVLoader.initDebug()) {
@@ -78,18 +79,41 @@ class VisionAnalyzer(
 
         // Режим калибровки
         if (isCalibrating) {
-            Log.d(TAG, "Калибровка: получен кадр")
+            calibrationFrameCount++
+            Log.d(TAG, "Калибровка: кадр ${calibrationFrameCount}/$NEED_FRAMES")
+
             val maskBitmap = autoCalibration.addFrame(currentFrame)
+
+            // Если получили маску ИЛИ набрали достаточно кадров
             if (maskBitmap != null) {
                 isCalibrating = false
                 loadMask(maskBitmap)
                 calibrationCallback?.invoke(true)
-                Log.d(TAG, "Калибровка завершена")
+                Log.d(TAG, "Калибровка завершена успешно! Маска получена на кадре $calibrationFrameCount")
+                calibrationFrameCount = 0
+            } else if (calibrationFrameCount >= NEED_FRAMES) {
+                isCalibrating = false
+                calibrationCallback?.invoke(false)
+                Log.d(TAG, "Калибровка завершена с ошибкой: маска не создалась")
+                calibrationFrameCount = 0
+            }
+
+            currentFrame.release()
+            imageProxy.close()
+            return
+        }
+
+        if (calibrationMask == null) {
+            // Один раз логируем, что калибровки нет
+            if (!noCalibrationLogged) {
+                Log.d(TAG, "Нет калибровки, анализ отключён")
+                noCalibrationLogged = true
             }
             currentFrame.release()
             imageProxy.close()
             return
         }
+        noCalibrationLogged = false
 
         detectMovement(currentFrame)
 
@@ -99,16 +123,6 @@ class VisionAnalyzer(
     }
 
     private fun detectMovement(currentFrame: Mat) {
-        // Если нет калибровки — не анализируем
-        if (calibrationMask == null) {
-            if (!noCalibrationLogged) {
-                Log.d(TAG, "Нет калибровки, анализ отключён")
-                noCalibrationLogged = true
-            }
-            return
-        }
-        noCalibrationLogged = false
-
         if (previousFrame == null) return
 
         // Проверка на кулдаун после последнего срабатывания
@@ -206,7 +220,7 @@ class VisionAnalyzer(
                     if (movement > MOVEMENT_THRESHOLD && wasCarStationary) {
                         detectionCounter++
                         if (detectionCounter > 2) {  // надо 3 подтверждения подряд
-                            Log.d(TAG, "🚗 Впереди машина поехала! movement=${"%.1f".format(movement)}")
+                            Log.d(TAG, "Впереди машина поехала! movement=${"%.1f".format(movement)}")
                             onMovementDetected()
                             lastTriggerTime = now
                             detectionCounter = 0
@@ -298,7 +312,7 @@ class VisionAnalyzer(
     }
 
     fun startCalibration(callback: (Boolean) -> Unit) {
-        Log.d(TAG, "startCalibration вызван!")
+        Log.d(TAG, "startCalibration вызван! isCalibrating устанавливается в true")
         calibrationCallback = callback
         isCalibrating = true
         autoCalibration.reset()
@@ -306,7 +320,7 @@ class VisionAnalyzer(
         previousFrame = null
         previousCarRect = null
         wasCarStationary = false
-        Log.d(TAG, "Начало автоматической калибровки")
+        Log.d(TAG, "Начало автоматической калибровки, isCalibrating=$isCalibrating")
     }
 
     fun loadMask(maskBitmap: Bitmap?) {

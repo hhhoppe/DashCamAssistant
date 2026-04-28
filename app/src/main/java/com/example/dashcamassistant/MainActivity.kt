@@ -23,6 +23,9 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.Locale
 import android.util.Log
+import android.os.Looper
+import android.os.Handler
+import android.content.Intent
 
 class MainActivity : AppCompatActivity() {
 
@@ -109,6 +112,47 @@ class MainActivity : AppCompatActivity() {
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val calibrationRequested = intent.getBooleanExtra("start_calibration", false)
+        Log.d("MainActivity", "onNewIntent: start_calibration = $calibrationRequested")
+
+        if (calibrationRequested) {
+            startCalibrationAfterCameraReady()
+        }
+    }
+
+    private fun startCalibrationAfterCameraReady() {
+        // Если анализатор уже создан, запускаем калибровку
+        if (visionAnalyzer != null) {
+            Log.d("MainActivity", "Запуск калибровки сразу")
+            startCalibration()
+        } else {
+            // Иначе сохраняем флаг, калибровка запустится в startCamera()
+            isCalibrationRequested = true
+            Log.d("MainActivity", "Калибровка отложена, visionAnalyzer ещё не создан")
+        }
+    }
+
+    private fun startCalibration() {
+        Toast.makeText(this, "Калибровка началась, поезжайте 30 секунд", Toast.LENGTH_LONG).show()
+        visionAnalyzer?.startCalibration { success ->
+            runOnUiThread {
+                if (success) {
+                    isCalibrationDone = true
+                    Toast.makeText(this, "Калибровка завершена!", Toast.LENGTH_LONG).show()
+                    val calibrationHelper = CalibrationHelper(this)
+                    visionAnalyzer?.getMaskBitmap()?.let { mask ->
+                        calibrationHelper.saveMask(mask)
+                    }
+                } else {
+                    Toast.makeText(this, "Ошибка калибровки", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
     private fun checkPermissions(): Boolean {
         return requiredPermissions.all {
             ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
@@ -171,28 +215,22 @@ class MainActivity : AppCompatActivity() {
                     this,
                     cameraSelector,
                     preview,
-                    videoCapture,
                     imageAnalysis
+                    // videoCapture - временно отключён для теста калибровки
                 )
 
                 // Запускаем калибровку после того, как bindToLifecycle успешно выполнился
                 if (isCalibrationRequested) {
                     Log.d("MainActivity", "Запуск калибровки после привязки камеры")
-                    visionAnalyzer?.startCalibration { success ->
-                        runOnUiThread {
-                            if (success) {
-                                isCalibrationDone = true
-                                Toast.makeText(this, "Калибровка завершена!", Toast.LENGTH_LONG).show()
-                                val calibrationHelper = CalibrationHelper(this)
-                                visionAnalyzer?.getMaskBitmap()?.let { mask ->
-                                    calibrationHelper.saveMask(mask)
-                                }
-                            } else {
-                                Toast.makeText(this, "Ошибка калибровки", Toast.LENGTH_SHORT).show()
-                            }
-                        }
+
+                    // Если есть отложенный запрос калибровки, запускаем её
+                    if (isCalibrationRequested) {
+                        Log.d("MainActivity", "Запуск отложенной калибровки после привязки камеры")
+                        isCalibrationRequested = false
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            startCalibration()
+                        }, 1000) // 1 сек
                     }
-                    isCalibrationRequested = false
                 }
 
             } catch (exc: Exception) {
@@ -267,10 +305,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showMovementWarning() {
-        binding.tvWarning.text = "🚗 Впереди поехали!"
+        binding.tvWarning.text = "Машина впереди начала движение"
         binding.tvWarning.visibility = android.view.View.VISIBLE
         binding.root.postDelayed({
             binding.tvWarning.visibility = android.view.View.GONE
-        }, 2000)
+        }, 2000) // 2 сек
     }
 }

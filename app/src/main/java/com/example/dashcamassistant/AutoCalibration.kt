@@ -50,7 +50,9 @@ class AutoCalibration {
 
         // Если набрали достаточно кадров - вычисляем маску
         if (framesAccumulated >= SAMPLE_FRAMES) {
-            return calculateMask()
+            val mask = calculateMask()
+            reset()  // сбрасываем состояние
+            return mask
         }
 
         return null
@@ -61,9 +63,13 @@ class AutoCalibration {
         val avgDiff = Mat()
         Core.divide(accumulatedDiff, Scalar(framesAccumulated.toDouble()), avgDiff)
 
-        // Статические области - где изменения минимальны
+        // Нормализуем для визуализации
+        val normalized = Mat()
+        Core.normalize(avgDiff, normalized, 0.0, 255.0, Core.NORM_MINMAX)
+
+        // Статические области (чёрные) - где изменения минимальны
         val staticMask = Mat()
-        Imgproc.threshold(avgDiff, staticMask, STATIC_THRESHOLD.toDouble(), 255.0, Imgproc.THRESH_BINARY_INV)
+        Imgproc.threshold(normalized, staticMask, STATIC_THRESHOLD.toDouble(), 255.0, Imgproc.THRESH_BINARY_INV)
 
         // Преобразуем в 8-bit для сохранения
         val mask8u = Mat()
@@ -84,6 +90,7 @@ class AutoCalibration {
 
         // Очистка
         avgDiff.release()
+        normalized.release()
         staticMask.release()
         mask8u.release()
         kernel.release()
