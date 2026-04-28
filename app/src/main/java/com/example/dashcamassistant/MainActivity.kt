@@ -22,6 +22,7 @@ import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.Locale
+import android.util.Log
 
 class MainActivity : AppCompatActivity() {
 
@@ -69,6 +70,7 @@ class MainActivity : AppCompatActivity() {
 
         // Проверяем, пришли ли из настроек с запросом на калибровку
         isCalibrationRequested = intent.getBooleanExtra("start_calibration", false)
+        Log.d("MainActivity", "isCalibrationRequested = $isCalibrationRequested")
 
         // Получаем высоту статус-бара
         val resourceId = resources.getIdentifier("status_bar_height", "dimen", "android")
@@ -163,26 +165,6 @@ class MainActivity : AppCompatActivity() {
             }
             imageAnalysis?.setAnalyzer(cameraExecutor, visionAnalyzer!!)
 
-            // Если запрошена калибровка, запускаем её
-            if (isCalibrationRequested) {
-                visionAnalyzer?.startCalibration { success ->
-                    runOnUiThread {
-                        if (success) {
-                            isCalibrationDone = true
-                            Toast.makeText(this, "Калибровка завершена!", Toast.LENGTH_LONG).show()
-                            // Сохраняем маску через CalibrationHelper
-                            val calibrationHelper = CalibrationHelper(this)
-                            visionAnalyzer?.getMaskBitmap()?.let { mask ->
-                                calibrationHelper.saveMask(mask)
-                            }
-                        } else {
-                            Toast.makeText(this, "Ошибка калибровки", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                }
-                isCalibrationRequested = false
-            }
-
             try {
                 cameraProvider.unbindAll()
                 cameraProvider.bindToLifecycle(
@@ -192,6 +174,27 @@ class MainActivity : AppCompatActivity() {
                     videoCapture,
                     imageAnalysis
                 )
+
+                // Запускаем калибровку после того, как bindToLifecycle успешно выполнился
+                if (isCalibrationRequested) {
+                    Log.d("MainActivity", "Запуск калибровки после привязки камеры")
+                    visionAnalyzer?.startCalibration { success ->
+                        runOnUiThread {
+                            if (success) {
+                                isCalibrationDone = true
+                                Toast.makeText(this, "Калибровка завершена!", Toast.LENGTH_LONG).show()
+                                val calibrationHelper = CalibrationHelper(this)
+                                visionAnalyzer?.getMaskBitmap()?.let { mask ->
+                                    calibrationHelper.saveMask(mask)
+                                }
+                            } else {
+                                Toast.makeText(this, "Ошибка калибровки", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                    isCalibrationRequested = false
+                }
+
             } catch (exc: Exception) {
                 Toast.makeText(this, "Ошибка запуска камеры: ${exc.message}", Toast.LENGTH_SHORT).show()
             }

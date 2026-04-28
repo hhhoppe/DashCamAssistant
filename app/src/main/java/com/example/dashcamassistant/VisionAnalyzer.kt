@@ -31,6 +31,8 @@ class VisionAnalyzer(
         private const val STATIONARY_THRESHOLD = 15     // порог "стоит"
         private const val ACCELEROMETER_THRESHOLD = 0.5f
         private const val COOLDOWN_MS = 3000            // Пауза между срабатываниями
+
+        private var noCalibrationLogged = false         // Для вывода лога о калибровки один раз
     }
 
     private var previousFrame: Mat? = null
@@ -76,6 +78,7 @@ class VisionAnalyzer(
 
         // Режим калибровки
         if (isCalibrating) {
+            Log.d(TAG, "Калибровка: получен кадр")
             val maskBitmap = autoCalibration.addFrame(currentFrame)
             if (maskBitmap != null) {
                 isCalibrating = false
@@ -98,9 +101,13 @@ class VisionAnalyzer(
     private fun detectMovement(currentFrame: Mat) {
         // Если нет калибровки — не анализируем
         if (calibrationMask == null) {
-            Log.d(TAG, "Нет калибровки, анализ отключён")
+            if (!noCalibrationLogged) {
+                Log.d(TAG, "Нет калибровки, анализ отключён")
+                noCalibrationLogged = true
+            }
             return
         }
+        noCalibrationLogged = false
 
         if (previousFrame == null) return
 
@@ -291,9 +298,14 @@ class VisionAnalyzer(
     }
 
     fun startCalibration(callback: (Boolean) -> Unit) {
+        Log.d(TAG, "startCalibration вызван!")
         calibrationCallback = callback
         isCalibrating = true
         autoCalibration.reset()
+        previousFrame?.release()
+        previousFrame = null
+        previousCarRect = null
+        wasCarStationary = false
         Log.d(TAG, "Начало автоматической калибровки")
     }
 

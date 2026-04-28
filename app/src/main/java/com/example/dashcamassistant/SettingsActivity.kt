@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.example.dashcamassistant.databinding.ActivitySettingsBinding
+import android.util.Log
 
 class SettingsActivity : AppCompatActivity() {
 
@@ -37,6 +38,7 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun startCalibration() {
+        Log.d("SettingsActivity", "startCalibration нажата")
         // Отправляем сигнал в MainActivity
         val intent = Intent(this, MainActivity::class.java).apply {
             putExtra("start_calibration", true)
