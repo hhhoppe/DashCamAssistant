@@ -10,8 +10,8 @@ class AutoCalibration {
 
     companion object {
         private const val TAG = "AutoCalibration"
-        private const val SAMPLE_FRAMES = 250      // 30 секунд при 5 кадрах/сек
-        private const val STATIC_THRESHOLD = 5    // порог изменения пикселя
+        private const val SAMPLE_FRAMES = 150      // 30 секунд при 5 кадрах/сек
+        private const val STATIC_THRESHOLD = 20    // порог изменения пикселя
     }
 
     private var framesAccumulated = 0
