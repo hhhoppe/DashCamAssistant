@@ -89,13 +89,15 @@ class VisionAnalyzer(
                 isCalibrating = false
                 loadMask(maskBitmap)
                 calibrationCallback?.invoke(true)
-                Log.d(TAG, "Калибровка завершена успешно! Маска получена на кадре $calibrationFrameCount")
+                Log.d(TAG, "Калибровка завершена успешно! Размер маски: ${maskBitmap.width}x${maskBitmap.height}")
                 calibrationFrameCount = 0
+                autoCalibration.reset()
             } else if (calibrationFrameCount >= NEED_FRAMES) {
                 isCalibrating = false
-                calibrationCallback?.invoke(false)
                 Log.d(TAG, "Калибровка завершена с ошибкой: маска не создалась")
+                calibrationCallback?.invoke(false)
                 calibrationFrameCount = 0
+                autoCalibration.reset()
             }
 
             currentFrame.release()
@@ -135,11 +137,12 @@ class VisionAnalyzer(
         }
 
         // Если телефон движется ИЛИ машина едет - не анализируем
-        if (isPhoneMoving || isCarMovingProvider()) {
-            previousCarRect = null
-            wasCarStationary = false
-            return
-        }
+        // ВРЕМЕННО ОТКЛЮЧЕНО ДЛЯ ТЕСТА КАЛИБРОВКИ ДОМА
+        // if (isPhoneMoving || isCarMovingProvider()) {
+        //     previousCarRect = null
+        //     wasCarStationary = false
+        //     return
+        // }
 
         val diff = Mat()
         Core.absdiff(previousFrame, currentFrame, diff)

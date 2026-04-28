@@ -136,7 +136,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startCalibration() {
-        Toast.makeText(this, "Калибровка началась, поезжайте 30 секунд", Toast.LENGTH_LONG).show()
+        Toast.makeText(this, "Калибровка началась, езжайте в обычном режиме 30 секунд", Toast.LENGTH_LONG).show()
         visionAnalyzer?.startCalibration { success ->
             runOnUiThread {
                 if (success) {
@@ -229,7 +229,7 @@ class MainActivity : AppCompatActivity() {
                         isCalibrationRequested = false
                         Handler(Looper.getMainLooper()).postDelayed({
                             startCalibration()
-                        }, 1000) // 1 сек
+                        }, 2000) // 2 сек
                     }
                 }
 

@@ -10,8 +10,8 @@ class AutoCalibration {
 
     companion object {
         private const val TAG = "AutoCalibration"
-        private const val SAMPLE_FRAMES = 150      // 30 секунд при 5 кадрах/сек
-        private const val STATIC_THRESHOLD = 15    // порог изменения пикселя
+        private const val SAMPLE_FRAMES = 250      // 30 секунд при 5 кадрах/сек
+        private const val STATIC_THRESHOLD = 5    // порог изменения пикселя
     }
 
     private var framesAccumulated = 0
@@ -29,6 +29,7 @@ class AutoCalibration {
             accumulatedDiff = Mat.zeros(grayFrame.rows(), grayFrame.cols(), CvType.CV_32FC1)
             framesAccumulated = 0
             grayFrame.release()
+            Log.d(TAG, "Первый кадр сохранён")
             return null
         }
 
@@ -50,8 +51,9 @@ class AutoCalibration {
 
         // Если набрали достаточно кадров - вычисляем маску
         if (framesAccumulated >= SAMPLE_FRAMES) {
+            Log.d(TAG, "Начинаем создание маски, кадров накоплено: $framesAccumulated")
             val mask = calculateMask()
-            reset()  // сбрасываем состояние
+            Log.d(TAG, "Маска создана: ${mask.width}x${mask.height}")
             return mask
         }
 
@@ -59,45 +61,29 @@ class AutoCalibration {
     }
 
     private fun calculateMask(): Bitmap {
-        // Усредняем накопленные изменения
+        // Усредняем различия
         val avgDiff = Mat()
         Core.divide(accumulatedDiff, Scalar(framesAccumulated.toDouble()), avgDiff)
+        Log.d(TAG, "avgDiff - min: ${Core.minMaxLoc(avgDiff).minVal}, max: ${Core.minMaxLoc(avgDiff).maxVal}")
 
-        // Нормализуем для визуализации
-        val normalized = Mat()
-        Core.normalize(avgDiff, normalized, 0.0, 255.0, Core.NORM_MINMAX)
+        // Пороговая обработка
+        val mask = Mat()
+        Imgproc.threshold(avgDiff, mask, STATIC_THRESHOLD.toDouble(), 255.0, Imgproc.THRESH_BINARY_INV)
+        val nonZero = Core.countNonZero(mask)
+        Log.d(TAG, "mask после threshold: ненулевых пикселей $nonZero из ${mask.rows() * mask.cols()}")
 
-        // Статические области (чёрные) - где изменения минимальны
-        val staticMask = Mat()
-        Imgproc.threshold(normalized, staticMask, STATIC_THRESHOLD.toDouble(), 255.0, Imgproc.THRESH_BINARY_INV)
-
-        // Преобразуем в 8-bit для сохранения
+        // Конвертируем в 8-bit
         val mask8u = Mat()
-        staticMask.convertTo(mask8u, CvType.CV_8UC1)
+        mask.convertTo(mask8u, CvType.CV_8UC1)
 
-        // Морфологическое закрытие для заполнения дырок
-        val kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, Size(5.0, 5.0))
-        val closedMask = Mat()
-        Imgproc.morphologyEx(mask8u, closedMask, Imgproc.MORPH_CLOSE, kernel)
-
-        // Дополнительно: инвертируем (черный - анализируем, белый - игнорируем)
-        val invertedMask = Mat()
-        Core.bitwise_not(closedMask, invertedMask)
-
-        // Конвертируем Mat в Bitmap
-        val bitmap = Bitmap.createBitmap(invertedMask.cols(), invertedMask.rows(), Bitmap.Config.ARGB_8888)
-        Utils.matToBitmap(invertedMask, bitmap)
+        // Конвертируем в Bitmap
+        val bitmap = Bitmap.createBitmap(mask8u.cols(), mask8u.rows(), Bitmap.Config.ARGB_8888)
+        Utils.matToBitmap(mask8u, bitmap)
 
         // Очистка
         avgDiff.release()
-        normalized.release()
-        staticMask.release()
+        mask.release()
         mask8u.release()
-        kernel.release()
-        closedMask.release()
-        invertedMask.release()
-
-        Log.d(TAG, "Калибровка завершена: маска создана")
 
         return bitmap
     }
@@ -108,5 +94,6 @@ class AutoCalibration {
         firstFrame = null
         accumulatedDiff = null
         framesAccumulated = 0
+        Log.d(TAG, "AutoCalibration сброшена")
     }
 }
