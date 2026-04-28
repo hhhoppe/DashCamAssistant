@@ -27,6 +27,11 @@ class SettingsActivity : AppCompatActivity() {
             startCalibration()
         }
 
+        // Кнопка показа маски (поверх камеры)
+        binding.btnShowMask.setOnClickListener {
+            showMaskOverlay()
+        }
+
         // Кнопка сброса калибровки
         binding.btnResetCalibration.setOnClickListener {
             Log.d("SettingsActivity", "Сброс калибровки нажат")
@@ -36,6 +41,21 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         updateCalibrationStatus()
+    }
+
+    private fun showMaskOverlay() {
+        // Проверяем, есть ли маска
+        if (!calibrationHelper.hasCalibration()) {
+            Toast.makeText(this, "Нет сохранённой маски. Сначала выполните калибровку.", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        // Запускаем активность с маской поверх камеры
+        // Используем FLAG_ACTIVITY_NEW_TASK для изоляции
+        val intent = Intent(this, MaskOverlayActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        }
+        startActivity(intent)
     }
 
     private fun startCalibration() {

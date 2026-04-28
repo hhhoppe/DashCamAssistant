@@ -41,6 +41,14 @@
         </activity>
 
         <activity android:name=".SettingsActivity" />
+
+        <activity
+            android:name=".MaskOverlayActivity"
+            android:theme="@style/Theme.AppCompat.NoActionBar"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:screenOrientation="fullSensor"
+            android:launchMode="singleInstance" />
+
     </application>
 
 </manifest>
