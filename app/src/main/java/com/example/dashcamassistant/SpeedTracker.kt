@@ -54,6 +54,13 @@ class SpeedTracker(
     }
 
     override fun onLocationChanged(location: Location) {
+        Log.d(TAG, "Location: lat=${location.latitude}, lon=${location.longitude}, hasSpeed=${location.hasSpeed()}, speed=${location.speed}")
+
+        if (!location.hasSpeed()) {
+            Log.d(TAG, "Speed not available")
+            return
+        }
+
         val speed = location.speed * 3.6f
         if (speed != currentSpeed) {
             currentSpeed = speed
