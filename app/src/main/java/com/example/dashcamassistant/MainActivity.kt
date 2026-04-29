@@ -215,8 +215,8 @@ class MainActivity : AppCompatActivity() {
                     this,
                     cameraSelector,
                     preview,
-                    imageAnalysis
-                    // videoCapture - временно отключён для теста калибровки
+                    imageAnalysis,
+                    videoCapture
                 )
 
                 // Запускаем калибровку после того, как bindToLifecycle успешно выполнился
