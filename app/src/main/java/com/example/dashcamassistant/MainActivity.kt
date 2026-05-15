@@ -38,9 +38,9 @@ class MainActivity : AppCompatActivity() {
     private var speedTracker: SpeedTracker? = null
 
     private var isCarMoving = false
-
     private var isCalibrationRequested = false
     private var isCalibrationDone = false
+    private var isCameraStarting = false
 
     // Необходимые разрешения
     private val requiredPermissions = arrayOf(
@@ -112,6 +112,14 @@ class MainActivity : AppCompatActivity() {
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
+    override fun onResume() {
+        super.onResume()
+
+        if (checkPermissions() && !isCameraStarting) {
+            startCamera()
+        }
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -176,6 +184,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startCamera() {
+        if (isCameraStarting) return
+        isCameraStarting = true
+
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
 
         cameraProviderFuture.addListener({
@@ -197,14 +208,18 @@ class MainActivity : AppCompatActivity() {
                 .build()
             videoCapture = VideoCapture.withOutput(recorder)
 
-            imageAnalysis = ImageAnalysis.Builder()
-                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                .build()
+            if (imageAnalysis == null) {
+                imageAnalysis = ImageAnalysis.Builder()
+                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .build()
+            }
 
             // Передаём в анализатор флаг движения автомобиля
-            visionAnalyzer = VisionAnalyzer(this, { isCarMoving }) {
-                runOnUiThread {
-                    showMovementWarning()
+            if (visionAnalyzer == null) {
+                visionAnalyzer = VisionAnalyzer(this, { isCarMoving }) {
+                    runOnUiThread {
+                        showMovementWarning()
+                    }
                 }
             }
             imageAnalysis?.setAnalyzer(cameraExecutor, visionAnalyzer!!)
@@ -232,9 +247,10 @@ class MainActivity : AppCompatActivity() {
                         }, 2000) // 2 сек
                     }
                 }
-
+                isCameraStarting = false
             } catch (exc: Exception) {
                 Toast.makeText(this, "Ошибка запуска камеры: ${exc.message}", Toast.LENGTH_SHORT).show()
+                isCameraStarting = false
             }
         }, ContextCompat.getMainExecutor(this))
     }
