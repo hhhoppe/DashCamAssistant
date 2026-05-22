@@ -7,11 +7,11 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
-    <!-- Для Android 13+ (Tiramisu) — фото и видео -->
+    <!-- Для Android 13+ - для доступа к сохранённым видео -->
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
 
-    <!-- Для Android 12 и ниже -->
+    <!-- Для старых версий Android 12 и ниже -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
 
@@ -30,6 +30,7 @@
         android:theme="@style/Theme.DashCamAssistant"
         android:requestLegacyExternalStorage="true">
 
+        <!-- Главный экран -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -40,8 +41,10 @@
             </intent-filter>
         </activity>
 
+        <!-- Меню настроек -->
         <activity android:name=".SettingsActivity" />
 
+        <!-- Экран просмотра маски -->
         <activity
             android:name=".MaskOverlayActivity"
             android:theme="@style/Theme.AppCompat.NoActionBar"

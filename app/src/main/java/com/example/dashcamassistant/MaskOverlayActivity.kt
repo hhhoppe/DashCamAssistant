@@ -18,26 +18,27 @@ import androidx.core.view.WindowCompat
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
+// Обработчик экрана показа маски
 class MaskOverlayActivity : AppCompatActivity() {
 
-    private lateinit var ivMask: ImageView
-    private lateinit var seekBarAlpha: SeekBar
-    private lateinit var tvAlpha: TextView
-    private lateinit var btnClose: Button
-    private lateinit var btnToggleOverlay: Button
-    private lateinit var tvInfo: TextView
-    private lateinit var previewView: androidx.camera.view.PreviewView
+    private lateinit var ivMask: ImageView          // Картинка с маской
+    private lateinit var seekBarAlpha: SeekBar      // Ползунок прозрачности
+    private lateinit var tvAlpha: TextView          // Текущая прозрачность
+    private lateinit var btnClose: Button           // Закрыть
+    private lateinit var btnToggleOverlay: Button   // Показать/скрыть маску
+    private lateinit var tvInfo: TextView           // Состояние маски
+    private lateinit var previewView: androidx.camera.view.PreviewView  // Картинка с камеры
 
     private var cameraExecutor: ExecutorService? = null
     private var cameraProvider: ProcessCameraProvider? = null
-    private var originalMask: Bitmap? = null
-    private var isOverlayVisible = true
+    private var originalMask: Bitmap? = null    // Маска
+    private var isOverlayVisible = true         // Статус показа маски
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_mask_overlay)
 
-        // На всю ширину, без статус-бара
+        // Убираем статус бар, чтобы изображение было на весь экран
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
         initViews()
@@ -46,6 +47,7 @@ class MaskOverlayActivity : AppCompatActivity() {
         startCamera()
     }
 
+    // Перезапуск камеры
     override fun onResume() {
         super.onResume()
         if (cameraProvider == null) {
@@ -57,12 +59,14 @@ class MaskOverlayActivity : AppCompatActivity() {
         super.onPause()
     }
 
+    // Освобождение камеры
     override fun onDestroy() {
         super.onDestroy()
         releaseCamera()
         originalMask?.recycle()
     }
 
+    // Находим все элементы интерфейса по их ID в layout-файле
     private fun initViews() {
         previewView = findViewById(R.id.previewView)
         ivMask = findViewById(R.id.ivMask)
@@ -77,6 +81,7 @@ class MaskOverlayActivity : AppCompatActivity() {
         seekBarAlpha.progress = 10 // 10% видимости по умолчанию
     }
 
+    // Метод для получения маски из файла и вывод на экран
     private fun loadMask() {
         val calibrationHelper = CalibrationHelper(this)
         originalMask = calibrationHelper.loadMask()
@@ -84,7 +89,6 @@ class MaskOverlayActivity : AppCompatActivity() {
         if (originalMask != null) {
             // Поворачиваем маску в соответствии с ориентацией экрана
             val rotatedMask = rotateMaskForDisplay(originalMask!!)
-
             ivMask.setImageBitmap(rotatedMask)
 
             // Применяем прозрачность после загрузки маски
@@ -92,9 +96,11 @@ class MaskOverlayActivity : AppCompatActivity() {
             ivMask.alpha = alpha
             tvAlpha.text = "Прозрачность маски: ${(alpha * 100).toInt()}%"
 
+            // Выводим состояние маски
             tvInfo.text = "Маска загружена\nБелые зоны - игнорируются\nЧёрные зоны - анализируются"
             tvInfo.setTextColor(Color.GREEN)
         } else {
+            // Сообщаем об ошибке и отключаем управление
             ivMask.setImageBitmap(null)
             tvInfo.text = "Нет сохранённой маски\nСначала выполните калибровку"
             tvInfo.setTextColor(Color.RED)
@@ -103,24 +109,23 @@ class MaskOverlayActivity : AppCompatActivity() {
         }
     }
 
+    // Метод для поворота маски под текущую ориентацию телефона
     private fun rotateMaskForDisplay(mask: Bitmap): Bitmap {
         val displayMetrics = resources.displayMetrics
         val screenWidth = displayMetrics.widthPixels
         val screenHeight = displayMetrics.heightPixels
 
-        // Определяем текущую ориентацию экрана
-        val rotation = windowManager.defaultDisplay.rotation
+        // Определяем текущую ориентацию экрана (вертикальная)
         val isPortrait = screenHeight > screenWidth
 
-        // Маска из калибровки всегда в landscape (ширина > высоты)
+        // Маска из калибровки всегда в горизонтальной ориентации
         val isMaskLandscape = mask.width > mask.height
 
+        // Подгоняем маску под экран
         return when {
-            // Портретная ориентация, маска горизонтальная - поворот НЕ нужен, просто масштабируем
             isPortrait && isMaskLandscape -> {
                 Bitmap.createScaledBitmap(mask, screenWidth, screenHeight, true)
             }
-            // Ландшафтная ориентация, маска горизонтальная - поворот на 90
             !isPortrait && isMaskLandscape -> {
                 val matrix = Matrix()
                 matrix.postRotate(90f)
@@ -133,6 +138,7 @@ class MaskOverlayActivity : AppCompatActivity() {
         }
     }
 
+    // Обработчики для кнопок
     private fun setupListeners() {
         // Закрыть активность
         btnClose.setOnClickListener {
@@ -159,8 +165,9 @@ class MaskOverlayActivity : AppCompatActivity() {
         })
     }
 
+    // Метод для показа камеры
     private fun startCamera() {
-        // Не запускаем камеру, если она уже есть и активна
+        // Не запускаем если уже запущена
         if (cameraProvider != null) {
             return
         }

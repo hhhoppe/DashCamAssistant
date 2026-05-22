@@ -7,7 +7,7 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
-    <!-- Превью камеры -->
+    <!-- Камера -->
     <androidx.camera.view.PreviewView
         android:id="@+id/previewView"
         android:layout_width="0dp"
@@ -32,7 +32,7 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        tools:text="⚠️ Впереди поехали!" />
+        tools:text="Машина впереди начала движение" />
 
     <!-- Скорость -->
     <TextView
@@ -51,7 +51,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <!-- Нижняя панель с кнопками -->
+    <!-- Панель управления -->
     <LinearLayout
         android:id="@+id/bottomPanel"
         android:layout_width="0dp"

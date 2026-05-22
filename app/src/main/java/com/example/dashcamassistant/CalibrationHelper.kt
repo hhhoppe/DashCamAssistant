@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import java.io.File
 import java.io.FileOutputStream
 
+// Управляет маской
 class CalibrationHelper(private val context: Context) {
 
     companion object {
@@ -15,7 +16,7 @@ class CalibrationHelper(private val context: Context) {
     private val maskFile: File
         get() = File(context.filesDir, MASK_FILE)
 
-    // Сохраняем маску калибровки (чёрный - анализируем, белый - игнорируем)
+    // Сохраняем маску
     fun saveMask(mask: Bitmap): Boolean {
         return try {
             FileOutputStream(maskFile).use { outputStream ->
@@ -35,10 +36,10 @@ class CalibrationHelper(private val context: Context) {
         } else null
     }
 
-    // Проверяем есть ли сохранённая калибровка
+    // Проверяем есть ли сохранённая маска
     fun hasCalibration(): Boolean = maskFile.exists()
 
-    // Сброс калибровки
+    // Сброс маски калибровки
     fun resetCalibration(): Boolean {
         return if (maskFile.exists()) {
             maskFile.delete()

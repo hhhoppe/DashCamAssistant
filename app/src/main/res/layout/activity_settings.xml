@@ -35,17 +35,4 @@
         android:text="Сбросить калибровку"
         android:backgroundTint="#FF9800" />
 
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="#333333"
-        android:layout_marginVertical="24dp" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Другие настройки будут добавлены позже"
-        android:textSize="14sp"
-        android:textColor="#888888" />
-
 </LinearLayout>

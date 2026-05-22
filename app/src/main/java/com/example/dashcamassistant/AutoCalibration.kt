@@ -7,30 +7,32 @@ import org.opencv.core.*
 import org.opencv.imgproc.Imgproc
 import kotlin.math.max
 
+// Хранит логику обработки кадров для маски
 class AutoCalibration {
 
     companion object {
         private const val TAG = "AutoCalibration"
-        private const val SAMPLE_FRAMES = 160      // 30 секунд при 5 кадрах/сек
-        private const val STATIC_THRESHOLD = 15    // стандартный порог изменения пикселя (если ошибка)
-        private const val LOWER_THRESHOLD = 5      // меньший порог для "сложных" случаев
-        private const val ADAPTIVE_PERCENT = 0.15  // адаптивный порог 15% от максимального значения
+        private const val SAMPLE_FRAMES = 160      // Необходимое кол-во кадров
+        private const val STATIC_THRESHOLD = 15    // Запасной порог на изменение пикселя
+        private const val LOWER_THRESHOLD = 5      // Меньший порог для тёмных участков
+        private const val ADAPTIVE_PERCENT = 0.15  // Адаптивный порог под текущее освещение
     }
 
-    private var framesAccumulated = 0
-    private var accumulatedDiff: Mat? = null
-    private var firstFrame: Mat? = null
+    private var framesAccumulated = 0           // Кол-во накопленных кадров
+    private var accumulatedDiff: Mat? = null    // Сумма изменений между кадрами
+    private var firstFrame: Mat? = null         // Первый взятый кадр
 
-    // Добавляем кадр для анализа
+    // Метод для добавления кадра в анализ
     fun addFrame(frame: Mat): Bitmap? {
         // Конвертируем в оттенки серого
         val grayFrame = Mat()
         Imgproc.cvtColor(frame, grayFrame, Imgproc.COLOR_BGR2GRAY)
 
+        // Если взятый кадр является первым, запоминаем его для дальнейшего сравнения
         if (firstFrame == null) {
             firstFrame = grayFrame.clone()
             accumulatedDiff = Mat.zeros(grayFrame.rows(), grayFrame.cols(), CvType.CV_32FC1)
-            framesAccumulated = 0
+            framesAccumulated = 1
             grayFrame.release()
             Log.d(TAG, "Первый кадр сохранён")
             return null
@@ -40,7 +42,7 @@ class AutoCalibration {
         val diff = Mat()
         Core.absdiff(firstFrame, grayFrame, diff)
 
-        // Накапливаем изменения
+        // Сохраняем разницу
         val floatDiff = Mat()
         diff.convertTo(floatDiff, CvType.CV_32FC1)
         Core.add(accumulatedDiff, floatDiff, accumulatedDiff)
@@ -52,22 +54,22 @@ class AutoCalibration {
 
         Log.d(TAG, "Калибровка: $framesAccumulated / $SAMPLE_FRAMES кадров")
 
-        // Если набрали достаточно кадров - вычисляем маску
+        // Если собрали нужное кол-во кадров - вычисляем маску
         if (framesAccumulated >= SAMPLE_FRAMES) {
-            Log.d(TAG, "Начинаем создание маски, кадров накоплено: $framesAccumulated")
+            Log.d(TAG, "Создание маски, кадров накоплено: $framesAccumulated")
 
-            // Получаем адаптивный порог
+            // Вычисляем порог по полученной яркости картинки
             val adaptiveThreshold = calculateAdaptiveThreshold()
 
-            // Пробуем с адаптивным порогом
+            // Пробуем создать маску с ним
             var mask = calculateMask(adaptiveThreshold)
 
-            // Проверяем качество маски
-            val nonZero = Core.countNonZero(mask)
-            val totalPixels = mask.rows() * mask.cols()
-            val staticPercent = nonZero * 100.0 / totalPixels
+            // Проверяем качество созданной маски
+            val nonZero = Core.countNonZero(mask)       // ненулевых пиксели
+            val totalPixels = mask.rows() * mask.cols()       // кол-во пикселей
+            val staticPercent = nonZero * 100.0 / totalPixels // статичные пиксели
 
-            Log.d(TAG, "Адаптивный порог: $adaptiveThreshold, статика: ${String.format("%.1f", staticPercent)}%")
+            Log.d(TAG, "Адаптивный порог: $adaptiveThreshold, статичные пиксели: ${String.format("%.1f", staticPercent)}%")
 
             // Если маска слишком пустая (<5%) или слишком полная (>95%) - пробуем другие пороги
             if (staticPercent < 5.0) {
@@ -80,6 +82,7 @@ class AutoCalibration {
                 mask = calculateMask(STATIC_THRESHOLD.toDouble())
             }
 
+            // Сохраняем маску
             val result = matToBitmap(mask)
             mask.release()
             reset()
@@ -89,9 +92,9 @@ class AutoCalibration {
         return null
     }
 
-    // Метод для вычисления адаптивного порога
+    // Метод для вычисления адаптивного порога (ярко - выше, темно - ниже)
     private fun calculateAdaptiveThreshold(): Double {
-        // Усредняем различия
+        // Усредняем накопленную разницу по всем кадрам
         val avgDiff = Mat()
         Core.divide(accumulatedDiff, Scalar(framesAccumulated.toDouble()), avgDiff)
 
@@ -101,36 +104,37 @@ class AutoCalibration {
 
         avgDiff.release()
 
-        // Адаптивный порог = 15% от максимальной разницы, но не менее 5 и не более 30
+        // Берём 15% от максимальной разницы, но не меньше 5 и не больше 30
         val adaptiveThreshold = max(5.0, maxVal * ADAPTIVE_PERCENT)
-        val clamped = adaptiveThreshold.coerceAtMost(30.0)  // Ограничиваем сверху
+        val clamped = adaptiveThreshold.coerceAtMost(30.0)
 
         Log.d(TAG, "Адаптивный порог: maxVal=$maxVal, ${ADAPTIVE_PERCENT * 100}% = $adaptiveThreshold, итого=$clamped")
 
         return clamped
     }
 
-    // Функция для расчета маски с параметром порога
+    // Функция для создания маски
     private fun calculateMask(threshold: Double): Mat {
         Log.d(TAG, "calculateMask() начал работу с порогом: $threshold")
 
-        // Усредняем различия
+        // Усредняем накопленную разницу по всем кадрам
         val avgDiff = Mat()
         Core.divide(accumulatedDiff, Scalar(framesAccumulated.toDouble()), avgDiff)
         Log.d(TAG, "avgDiff создан, размер: ${avgDiff.rows()}x${avgDiff.cols()}")
         val minMax = Core.minMaxLoc(avgDiff)
         Log.d(TAG, "avgDiff min=${minMax.minVal}, max=${minMax.maxVal}")
 
-        // Пороговая обработка
+        // Белые - статичные пиксели
         val mask = Mat()
         Imgproc.threshold(avgDiff, mask, threshold, 255.0, Imgproc.THRESH_BINARY_INV)
         Log.d(TAG, "threshold выполнен")
 
+        // Проверка
         val nonZero = Core.countNonZero(mask)
         val totalPixels = mask.rows() * mask.cols()
         Log.d(TAG, "mask: ненулевых пикселей = $nonZero из $totalPixels (${nonZero * 100 / totalPixels}%)")
         if (nonZero == 0) {
-            Log.w(TAG, "Маска полностью чёрная (нет статичных пикселей).")
+            Log.w(TAG, "Маска полностью состоит из ненулевых пикселей.")
         }
 
         // Очистка
@@ -139,7 +143,7 @@ class AutoCalibration {
         return mask
     }
 
-    // Конвертация Mat в Bitmap
+    // Конвертация Mat из OpenCV в Bitmap
     private fun matToBitmap(mat: Mat): Bitmap {
         // Конвертируем в 8-bit если нужно
         val mask8u = if (mat.type() != CvType.CV_8UC1) {
@@ -150,7 +154,6 @@ class AutoCalibration {
             mat.clone()
         }
 
-        // Используем cols() и rows() как функции
         val bitmap = Bitmap.createBitmap(mask8u.cols(), mask8u.rows(), Bitmap.Config.ARGB_8888)
         Utils.matToBitmap(mask8u, bitmap)
 
@@ -160,6 +163,7 @@ class AutoCalibration {
         return bitmap
     }
 
+    // Метод для сброса калибровки
     fun reset() {
         firstFrame?.release()
         accumulatedDiff?.release()

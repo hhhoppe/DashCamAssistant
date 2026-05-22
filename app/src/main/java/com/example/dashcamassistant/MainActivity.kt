@@ -39,7 +39,6 @@ class MainActivity : AppCompatActivity() {
 
     private var isCarMoving = false
     private var isCalibrationRequested = false
-    private var isCalibrationDone = false
     private var isCameraStarting = false
 
     // Необходимые разрешения
@@ -148,7 +147,6 @@ class MainActivity : AppCompatActivity() {
         visionAnalyzer?.startCalibration { success ->
             runOnUiThread {
                 if (success) {
-                    isCalibrationDone = true
                     Toast.makeText(this, "Калибровка завершена!", Toast.LENGTH_LONG).show()
                     val calibrationHelper = CalibrationHelper(this)
                     visionAnalyzer?.getMaskBitmap()?.let { mask ->

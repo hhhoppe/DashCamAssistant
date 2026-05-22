@@ -5,13 +5,13 @@
     android:layout_height="match_parent"
     android:background="#CC000000">
 
-    <!-- Камера (через SurfaceView из превью) -->
+    <!-- Камера -->
     <androidx.camera.view.PreviewView
         android:id="@+id/previewView"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!-- Маска поверх камеры -->
+    <!-- Маска  -->
     <ImageView
         android:id="@+id/ivMask"
         android:layout_width="match_parent"
@@ -19,7 +19,7 @@
         android:scaleType="fitXY"
         android:contentDescription="Маска калибровки" />
 
-    <!-- Панель управления (полупрозрачная) -->
+    <!-- Панель управления -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
