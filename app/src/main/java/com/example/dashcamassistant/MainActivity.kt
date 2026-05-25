@@ -27,6 +27,7 @@ import android.os.Looper
 import android.os.Handler
 import android.content.Intent
 
+// Обработчик главного экрана
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
@@ -38,7 +39,7 @@ class MainActivity : AppCompatActivity() {
     private var speedTracker: SpeedTracker? = null
 
     private var isCarMoving = false
-    private var isCalibrationRequested = false
+    private var isCalibrationRequested = false // Флаг для запроса калибровки
     private var isCameraStarting = false
 
     // Необходимые разрешения
@@ -65,12 +66,13 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Убираем стандартные отступы системы
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Проверяем, пришли ли из настроек с запросом на калибровку
+        // Проверяем, если мы пришли ли из настроек с запросом на калибровку
         isCalibrationRequested = intent.getBooleanExtra("start_calibration", false)
         Log.d("MainActivity", "isCalibrationRequested = $isCalibrationRequested")
 
@@ -78,7 +80,7 @@ class MainActivity : AppCompatActivity() {
         val resourceId = resources.getIdentifier("status_bar_height", "dimen", "android")
         val statusBarHeight = if (resourceId > 0) resources.getDimensionPixelSize(resourceId) else 0
 
-        // Применяем отступ к tvSpeed
+        // Применяем отступ к тексту со скоростью
         val params = binding.tvSpeed.layoutParams as androidx.constraintlayout.widget.ConstraintLayout.LayoutParams
         params.topMargin = statusBarHeight
         binding.tvSpeed.layoutParams = params
@@ -114,6 +116,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
 
+        // перезапускаем камеру если есть разрешения и она не запущена
         if (checkPermissions() && !isCameraStarting) {
             startCamera()
         }

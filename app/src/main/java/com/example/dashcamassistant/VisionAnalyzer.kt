@@ -15,6 +15,7 @@ import org.opencv.imgproc.Imgproc
 import android.graphics.Bitmap
 import org.opencv.android.Utils
 
+// Класс для анализа кадров
 class VisionAnalyzer(
     context: Context,
     private val isCarMovingProvider: () -> Boolean,
@@ -28,41 +29,43 @@ class VisionAnalyzer(
         private const val MOVEMENT_THRESHOLD = 120      // Минимальное смещение объекта
         private const val MIN_CONTOUR_AREA = 2500       // Минимальный размер объекта
         private const val MIN_CAR_WIDTH = 100           // Минимальная ширина машины
-        private const val STATIONARY_THRESHOLD = 15     // порог "стоит"
+        private const val STATIONARY_THRESHOLD = 15     // Минимальный сдвиг объекта
         private const val ACCELEROMETER_THRESHOLD = 0.5f
         private const val COOLDOWN_MS = 3000            // Пауза между срабатываниями
-        private var noCalibrationLogged = false
+        private var noCalibrationLogged = false         // Сделана ли калибровка
     }
 
-    private var previousFrame: Mat? = null
-    private var previousCarRect: Rect? = null
-    private var wasCarStationary = false
-    private var lastTriggerTime = 0L
-    private var detectionCounter = 0
+    private var previousFrame: Mat? = null              // Предыдущий кадр
+    private var previousCarRect: Rect? = null           // Положение авто на предыдущем кадре
+    private var wasCarStationary = false                // Стояла или ехала
+    private var lastTriggerTime = 0L                    // Время последнего срабатывания
+    private var detectionCounter = 0                    // Счётчик подтверждений
 
     private val sensorManager: SensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
     private val accelerometer: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-    private var isPhoneMoving = false
+    private var isPhoneMoving = false                   // Движение телефона
 
-    private var movementCounter = 0
-    private var stableCounter = 0
+    private var movementCounter = 0                     // Счётчик движений
+    private var stableCounter = 0                       // Счётчик спокойствия
 
-    private var calibrationMask: Mat? = null
-    var isCalibrating = false
-    private val autoCalibration = AutoCalibration()
+    private var calibrationMask: Mat? = null            // Маска статичных зон
+    var isCalibrating = false                           // Включен режим колибровки
+    private val autoCalibration = AutoCalibration()     // Сборщик кадров и маски
     private var calibrationCallback: ((Boolean) -> Unit)? = null
     private var calibrationFrameCount = 0
-    private val NEED_FRAMES = 150
+    private val NEED_FRAMES = 150                       // Необхожимое кол-во кадров для калибровки
 
     init {
+        // Загружаем библиотеку OpenCV
         if (!OpenCVLoader.initDebug()) {
             Log.e(TAG, "OpenCV initialization failed")
         }
+        // Подключает акселерометр для отслеживания движения телефона
         accelerometer?.let {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
         }
 
-        // Загружаем сохранённую маску
+        // Загружаем ранее сохранённую маску
         val calibrationHelper = CalibrationHelper(context)
         val savedMask = calibrationHelper.loadMask()
         if (savedMask != null) {
@@ -71,7 +74,9 @@ class VisionAnalyzer(
         }
     }
 
+    // Метод для анализа кадра
     override fun analyze(imageProxy: ImageProxy) {
+        // Конвертируем в формат для OpenCV
         val currentFrame = imageProxy.toMat() ?: run {
             imageProxy.close()
             return
@@ -85,7 +90,7 @@ class VisionAnalyzer(
             val maskBitmap = autoCalibration.addFrame(currentFrame)
             Log.d(TAG, "После addFrame: maskBitmap = ${if (maskBitmap != null) "НЕ null" else "null"}")
 
-            // Если получили маску ИЛИ набрали достаточно кадров
+            // Если получили маску - завершаем калибровку, иначе - ошибка
             if (maskBitmap != null) {
                 isCalibrating = false
                 loadMask(maskBitmap)
@@ -106,8 +111,8 @@ class VisionAnalyzer(
             return
         }
 
+        // Если маски нет - не анализируем
         if (calibrationMask == null) {
-            // Один раз логируем, что калибровки нет
             if (!noCalibrationLogged) {
                 Log.d(TAG, "Нет калибровки, анализ отключён")
                 noCalibrationLogged = true
@@ -118,13 +123,16 @@ class VisionAnalyzer(
         }
         noCalibrationLogged = false
 
+        // Анализ движения
         detectMovement(currentFrame)
 
+        // Сохраняем кадр для дальнейшего сравнения
         previousFrame?.release()
         previousFrame = currentFrame
         imageProxy.close()
     }
 
+    // Метод для детекции движения
     private fun detectMovement(currentFrame: Mat) {
         if (previousFrame == null) return
 
@@ -138,32 +146,33 @@ class VisionAnalyzer(
         }
 
         // Если телефон движется ИЛИ машина едет - не анализируем
-        // ВРЕМЕННО ОТКЛЮЧЕНО ДЛЯ ТЕСТА КАЛИБРОВКИ ДОМА
+        // ВРЕМЕННО ОТКЛЮЧЕНО ДЛЯ ТЕСТА
         // if (isPhoneMoving || isCarMovingProvider()) {
         //     previousCarRect = null
         //     wasCarStationary = false
         //     return
         // }
 
+        // Находим разницу между кадрами
         val diff = Mat()
         Core.absdiff(previousFrame, currentFrame, diff)
 
+        // Переводим в оттенки серего и отсекаем шум
         val gray = Mat()
         Imgproc.cvtColor(diff, gray, Imgproc.COLOR_BGR2GRAY)
-
         Imgproc.threshold(gray, gray, 30.0, 255.0, Imgproc.THRESH_BINARY)
 
         val kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, Size(8.0, 8.0))
         Imgproc.morphologyEx(gray, gray, Imgproc.MORPH_CLOSE, kernel)
         Imgproc.morphologyEx(gray, gray, Imgproc.MORPH_OPEN, kernel)
 
+        // Находим контуры двищущихся объектов
         val contours = mutableListOf<MatOfPoint>()
         val hierarchy = Mat()
         Imgproc.findContours(gray, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
 
-        // Проверка по маске калибровки: игнорируем зоны, отмеченные белым
+        // Проверка по маске калибровки (игнорируем белые зоны)
         if (calibrationMask != null) {
-            // Удаляем контуры, которые попадают в запрещённую зону
             contours.removeAll { contour ->
                 val rect = Imgproc.boundingRect(contour)
                 val centerX = rect.x + rect.width / 2
@@ -176,9 +185,10 @@ class VisionAnalyzer(
             }
         }
 
+        // Параметры кадра
         val frameHeight = currentFrame.rows()
         val frameWidth = currentFrame.cols()
-        val bottomHalfY = frameHeight / 2
+        val bottomHalfY = frameHeight / 2   // нижняя половина кадра
         val centerRegionX = frameWidth / 4  // центральная зона по горизонтали
 
         // Ищем подходящий контур
@@ -190,13 +200,13 @@ class VisionAnalyzer(
                 val height = rect.height
 
                 // Условия для машины:
-                area > MIN_CONTOUR_AREA &&                    // достаточно большая
+                area > MIN_CONTOUR_AREA &&                    // в большей площади
                         width > MIN_CAR_WIDTH &&              // широкая
-                        width > height &&                     // шире чем высота (машина)
-                        rect.x + width > centerRegionX &&     // не слишком слева
-                        rect.x < frameWidth - centerRegionX   // не слишком справа
+                        width > height &&                     // шире чем высота
+                        rect.x + width > centerRegionX &&
+                        rect.x < frameWidth - centerRegionX   // находится в центре
             }
-            .maxByOrNull { Imgproc.contourArea(it) }
+            .maxByOrNull { Imgproc.contourArea(it) }          // берём самый большой
 
         if (carContour != null) {
             val boundingRect = Imgproc.boundingRect(carContour)
@@ -205,8 +215,10 @@ class VisionAnalyzer(
             if (boundingRect.y + boundingRect.height > bottomHalfY) {
 
                 if (previousCarRect != null) {
+                    // Центр прямоугольника на прошлом кадре
                     val prevCenterX = previousCarRect!!.left + previousCarRect!!.width() / 2
                     val prevCenterY = previousCarRect!!.top + previousCarRect!!.height() / 2
+                    // На текущем кадре
                     val currCenterX = boundingRect.x + boundingRect.width / 2
                     val currCenterY = boundingRect.y + boundingRect.height / 2
 
@@ -220,7 +232,7 @@ class VisionAnalyzer(
                         Log.d(TAG, "Движение: ${"%.1f".format(movement)} пикс, dx=$dx, dy=$dy, area=${Imgproc.contourArea(carContour)}")
                     }
 
-                    // Основная логика
+                    // Если объект резко сдвинулся и до этого стоял на месте
                     if (movement > MOVEMENT_THRESHOLD && wasCarStationary) {
                         detectionCounter++
                         if (detectionCounter > 2) {  // надо 3 подтверждения подряд
@@ -230,6 +242,7 @@ class VisionAnalyzer(
                             detectionCounter = 0
                             wasCarStationary = false
                         }
+                    // Если почти не двинулся
                     } else if (movement < STATIONARY_THRESHOLD) {
                         detectionCounter = 0
                         wasCarStationary = true
@@ -238,6 +251,7 @@ class VisionAnalyzer(
                     }
                 }
 
+                // Запоминаем положение ТС для следующего кадра
                 previousCarRect = Rect(
                     boundingRect.x,
                     boundingRect.y,
@@ -245,11 +259,13 @@ class VisionAnalyzer(
                     boundingRect.y + boundingRect.height
                 )
             } else {
+                // Контур не в нижней половине
                 previousCarRect = null
                 wasCarStationary = false
                 detectionCounter = 0
             }
         } else {
+            // Не нашли объект
             previousCarRect = null
             wasCarStationary = false
             detectionCounter = 0
@@ -262,12 +278,14 @@ class VisionAnalyzer(
         contours.forEach { it.release() }
     }
 
+    // Метод для акселерометра
     override fun onSensorChanged(event: SensorEvent) {
         if (event.sensor.type == Sensor.TYPE_ACCELEROMETER) {
             val x = event.values[0]
             val y = event.values[1]
             val z = event.values[2]
 
+            // Общее ускорение
             val acceleration = kotlin.math.sqrt(x * x + y * y + z * z)
 
             if (acceleration > ACCELEROMETER_THRESHOLD + 9.8) {
@@ -288,6 +306,7 @@ class VisionAnalyzer(
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 
+    // Метод для конвертации кадров из CameraX в Mat (OpenCV)
     private fun ImageProxy.toMat(): Mat? {
         return try {
             val planes = this.planes
