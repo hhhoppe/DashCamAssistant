@@ -222,9 +222,11 @@ class VisionAnalyzer(
                     val currCenterX = boundingRect.x + boundingRect.width / 2
                     val currCenterY = boundingRect.y + boundingRect.height / 2
 
+                    // Смещение по горизонтали и вертикали
                     val dx = currCenterX - prevCenterX
                     val dy = currCenterY - prevCenterY
 
+                    // Считаем евклидово расстояние
                     val movement = kotlin.math.sqrt((dx * dx + dy * dy).toDouble())
 
                     // Лог для отладки
