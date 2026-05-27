@@ -49,11 +49,11 @@ class VisionAnalyzer(
     private var stableCounter = 0                       // Счётчик спокойствия
 
     private var calibrationMask: Mat? = null            // Маска статичных зон
-    var isCalibrating = false                           // Включен режим колибровки
+    var isCalibrating = false                           // Включен режим калибровки
     private val autoCalibration = AutoCalibration()     // Сборщик кадров и маски
     private var calibrationCallback: ((Boolean) -> Unit)? = null
     private var calibrationFrameCount = 0
-    private val NEED_FRAMES = 150                       // Необхожимое кол-во кадров для калибровки
+    private val NEED_FRAMES = 150                       // Необходимое кол-во кадров для калибровки
 
     init {
         // Загружаем библиотеку OpenCV
